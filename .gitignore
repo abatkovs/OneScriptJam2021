@@ -4,7 +4,13 @@
 [Bb]uild/
 [Bb]uilds/
 Assets/AssetStoreTools*
+
+#Project specific
+*.log
+tripolygon.meta
 Assets/tripolygon
+Assets/PinwheelFantasyEffect
+Assets/TextMesh Pro
 
 # Visual Studio cache directory
 .vs/
@@ -25,7 +31,7 @@ ExportedObj/
 *.pdb
 *.opendb
 *.VC.db
-*.log
+
 
 # Unity3D generated meta files
 *.pidb.meta
