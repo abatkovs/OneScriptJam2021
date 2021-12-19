@@ -59,7 +59,7 @@ public class TheScript : MonoBehaviour
     {
         Movement();
         UpdateCameraPosition();
-        Debug();
+        //Debug();
     }
 
     #region User Interface
@@ -136,39 +136,39 @@ public class TheScript : MonoBehaviour
 
     private void Debug()
     {
-        Vector3 offset = new Vector3();
+        //Vector3 offset = new Vector3();
         //Change
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            _playerGo.transform.position = _playerStartPosition;
-            _playerGo.transform.rotation = _playerStartRotation;
-        }
+        // if (Input.GetKeyDown(KeyCode.R))
+        // {
+        //     _playerGo.transform.position = _playerStartPosition;
+        //     _playerGo.transform.rotation = _playerStartRotation;
+        // }
 
         // if (Input.GetKeyDown(KeyCode.T))
         // {
         //     StartCoroutine(KnockBack(Vector3.forward, _playerGo,6));
         // }
 
-        if (Input.GetKeyDown(KeyCode.Y))
-        {
-            for (int i = 0; i < 50; i++)
-            {
-                for (int j = 0; j < 50; j++)
-                {
-                    Instantiate(_trailPf, new Vector3(i-25,0.92f,j-25), Quaternion.identity);
-                }
-            }
-        }
-
-        if (Input.GetKeyDown(KeyCode.Q))
-        {
-            RaycastHit[] Results = new RaycastHit[4];
-            int hits = Physics.RaycastNonAlloc(_playerGo.transform.position, Vector3.down, Results, Mathf.Infinity);
-            for (int i = 0; i < hits; i++)
-            {
-                UnityEngine.Debug.Log($"Rayhit: {Results[i].transform.name}");
-            }
-        }
+        // if (Input.GetKeyDown(KeyCode.Y))
+        // {
+        //     for (int i = 0; i < 50; i++)
+        //     {
+        //         for (int j = 0; j < 50; j++)
+        //         {
+        //             Instantiate(_trailPf, new Vector3(i-25,0.92f,j-25), Quaternion.identity);
+        //         }
+        //     }
+        // }
+        //
+        // if (Input.GetKeyDown(KeyCode.Q))
+        // {
+        //     RaycastHit[] Results = new RaycastHit[4];
+        //     int hits = Physics.RaycastNonAlloc(_playerGo.transform.position, Vector3.down, Results, Mathf.Infinity);
+        //     for (int i = 0; i < hits; i++)
+        //     {
+        //         UnityEngine.Debug.Log($"Rayhit: {Results[i].transform.name}");
+        //     }
+        // }
         
         if(Input.GetKeyDown(KeyCode.P)) SpawnEnemies(4);
     }
@@ -249,10 +249,10 @@ public class TheScript : MonoBehaviour
 
     private void DestroyOnCollision(Transform result, GameObject owner)
     {
-        UnityEngine.Debug.Log($"Ōwner {owner} result {result.transform.gameObject} player {_playerGo}");
+        //UnityEngine.Debug.Log($"Ōwner {owner} result {result.transform.gameObject} player {_playerGo}");
         if (owner == _playerGo || result.gameObject == _playerGo)
         {
-            UnityEngine.Debug.Log("Player destroyed. > GameOver");
+            //UnityEngine.Debug.Log("Player destroyed. > GameOver");
             GameOver();
         }
         
@@ -342,7 +342,8 @@ public class TheScript : MonoBehaviour
     {
         if (_playerScore > _enemyScore)
         {
-            UnityEngine.Debug.Log("You Win.");
+            //UnityEngine.Debug.Log("You Win.");
+            //TODO
         }
     }
 
@@ -391,9 +392,11 @@ public class TheScript : MonoBehaviour
 
         for (int i = 0; i < _enemyChecksForObstacles; i++)
         {
+            
             //check for wall
             if (wall)
             {
+
                 //UnityEngine.Debug.Log($"Enemy {enemy.name} detected wall in {randomDirection} direction.");
                 randomDirection = RandomVector3Direction();
                 wall = CheckForWall(enemyPos, randomDirection);
