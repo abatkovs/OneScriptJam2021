@@ -6,6 +6,7 @@ using Unity.VisualScripting;
 using UnityEngine;
 using TMPro;
 using UnityEditor;
+using UnityEngine.SceneManagement;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
@@ -71,6 +72,12 @@ public class TheScript : MonoBehaviour
     {
         _gameStarted = true;
         // Hide ui elements
+        _startBtn.transform.gameObject.SetActive(false);
+    }
+
+    public void RestartGame()
+    {
+        SceneManager.LoadScene(0);
     }
 
     #endregion
@@ -218,8 +225,8 @@ public class TheScript : MonoBehaviour
             {
                 goName = Results[i].transform.name;
                 colliderName = Results[i].collider.name;
-                UnityEngine.Debug.Log(colliderName);
-                if (trails) Destroy(owner);
+//                UnityEngine.Debug.Log(colliderName);
+                if (trails) DestroyOnCollision(Results[i].transform,  owner);
                 if (movementVector == Vector3.down)
                 {
 //                    UnityEngine.Debug.Log($"Down: {colliderName}");
@@ -242,16 +249,36 @@ public class TheScript : MonoBehaviour
 
     private void DestroyOnCollision(Transform result, GameObject owner)
     {
+        UnityEngine.Debug.Log($"Ōwner {owner} result {result.transform.gameObject} player {_playerGo}");
+        if (owner == _playerGo || result.gameObject == _playerGo)
+        {
+            UnityEngine.Debug.Log("Player destroyed. > GameOver");
+            GameOver();
+        }
+        
         Instantiate(_particlePf, result.position, Quaternion.identity);
         Instantiate(_particlePf, owner.transform.position, Quaternion.identity);
         Destroy(result.gameObject);
         Destroy(owner);
-        if (owner == _playerGo)
-        {
-            UnityEngine.Debug.Log("Player destroyed. > GameOver");
-        }
+
     }
 
+    private void GameOver()
+    {
+        //show loose text
+        //some random text/score ?
+        //show restart button
+        _restartBtn.transform.gameObject.SetActive(true);
+        if (_playerScore > _enemyScore)
+        {
+            _winTxt.transform.gameObject.SetActive(true);
+        }
+        else
+        {
+            _loseTxt.transform.gameObject.SetActive(true);
+        }
+
+    }
 
     private IEnumerator KnockBack(Vector3 dir, GameObject go, int times)
     {
