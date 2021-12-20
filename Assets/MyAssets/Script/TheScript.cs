@@ -14,10 +14,14 @@ using Random = UnityEngine.Random;
 public class TheScript : MonoBehaviour
 {
     [SerializeField] private bool _gameStarted;
+    private static string _enemyStr = "Enemy";
+    private static string _playerStr = "Player";
+
     
     [SerializeField] private Color _playerColor = Color.green;
     [SerializeField] private Color _enemyColor = Color.red;
     [SerializeField] private GameObject _playerGo;
+    [SerializeField] private float _playerMaxYpos = 0;
     [SerializeField] private GameObject _playerTrail;
     private Vector3 _playerStartPosition;
     private Quaternion _playerStartRotation;
@@ -32,6 +36,7 @@ public class TheScript : MonoBehaviour
     [SerializeField] private float _rollSpeed = 5;
     private bool _isMoving;
     private bool _isKnockedBack;
+    [SerializeField] private GameObject _hunter;
     [SerializeField] private GameObject _enemyPf;
     [SerializeField] private List<GameObject> _enemies;
     [SerializeField] private int _enemyChecksForObstacles = 5;
@@ -43,9 +48,6 @@ public class TheScript : MonoBehaviour
     [SerializeField] private int _playerScore;
     [SerializeField] private int _enemyScore;
 
-    [Space] [Header("User Interface")] 
-    [SerializeField] private TMP_Text _playerScoreTxt;
-    [SerializeField] private TMP_Text _enemyScoreTxt;
 
     private void Start()
     {
@@ -53,26 +55,60 @@ public class TheScript : MonoBehaviour
         _playerStartPosition = _playerGo.transform.position;
         _playerStartRotation = _playerGo.transform.rotation;
         SpawnEnemies(4);
+        SpawnHunter();
     }
 
     private void Update()
     {
+        
         Movement();
         UpdateCameraPosition();
+        if (_playerGo == null) return;
+        UpdateMaxY();
         //Debug();
     }
 
-    #region User Interface
+    //First time collision not detected correctly and rigid bodies go wild.
+    private void UpdateMaxY()
+    {
+        float colisionDiff = 1.8f;
+        float playerY = _playerGo.transform.position.y;
+        if (playerY > _playerMaxYpos)
+        {
+            _playerMaxYpos = playerY;
+        }
 
+        if(_playerMaxYpos > colisionDiff) NotDetectedCollision();
+
+
+    }
+
+    #region User Interface    
+    [Space] [Header("User Interface")] 
+    [SerializeField] private TMP_Text _playerScoreTxt;
+    [SerializeField] private TMP_Text _enemyScoreTxt;
+    
     [SerializeField] private Button _startBtn;
     [SerializeField] private Button _restartBtn;
     [SerializeField] private TMP_Text _winTxt;
     [SerializeField] private TMP_Text _loseTxt;
+    [SerializeField] private GameObject _BG;
+    [SerializeField] private GameObject _creditsBtn;
+    [SerializeField] private GameObject _credits;
     public void StartGame()
     {
+        _creditsBtn.SetActive(false);
+        _BG.SetActive(false);
+        _playerScoreTxt.transform.gameObject.SetActive(true);
+        _enemyScoreTxt.transform.gameObject.SetActive(true);
         _gameStarted = true;
         // Hide ui elements
         _startBtn.transform.gameObject.SetActive(false);
+    }
+
+    public void ToggleCredits()
+    {
+        _credits.SetActive(!_credits.activeSelf);
     }
 
     public void RestartGame()
@@ -109,22 +145,22 @@ public class TheScript : MonoBehaviour
         if (_playerGo == null) return;
         if (_isMoving || _isKnockedBack) return;
 
-        if (Input.GetKey(KeyCode.A))
+        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
         {
             RollDirection(Vector3.left, _playerGo);
             MoveEnemies();
         }
-        else if (Input.GetKey(KeyCode.D))
+        else if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow))
         {
             RollDirection(Vector3.right, _playerGo);
             MoveEnemies();
         }
-        else if (Input.GetKey(KeyCode.W))
+        else if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow))
         {
             RollDirection(Vector3.forward, _playerGo);
             MoveEnemies();
         }
-        else if (Input.GetKey(KeyCode.S))
+        else if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
         {
             RollDirection(Vector3.back, _playerGo);
             MoveEnemies();
@@ -187,6 +223,7 @@ public class TheScript : MonoBehaviour
         StartCoroutine(Roll(anchor, axis, go, dir));
     }
 
+
     
     private IEnumerator Roll(Vector3 anchor, Vector3 axis, GameObject go, Vector3 dir)
     {
@@ -200,9 +237,29 @@ public class TheScript : MonoBehaviour
             yield return new WaitForSeconds(0.01f);
         }
 
-        CheckMove(Vector3.down, go, _varRayDistance);
+        CheckMove(Vector3.down, go/*, _varRayDistance*/);
+
         _isMoving = false;
 
+    }
+    
+
+
+    private void MoveEnemies()
+    {
+        HunterLogic();
+        Vector3 randomDirection = new Vector3();
+        foreach (var enemy in _enemies)
+        {
+            
+            if(enemy == null) continue;
+            randomDirection = RandomVector3Direction();
+            //Check for obstacles then move>>>
+            CheckForObstacles(enemy, randomDirection);
+            
+
+        }
+        
     }
     
     //[SerializeField] private float _reduceVectorBy = 2;
@@ -214,8 +271,9 @@ public class TheScript : MonoBehaviour
         bool trails = false;
         if (movementVector != Vector3.down)
         {
-            trails = CheckForTrails(owner.transform.position, movementVector);
+            trails = CheckForTrails(owner.transform, movementVector);
         }
+        
         int hits = Physics.RaycastNonAlloc(owner.transform.position + (movementVector/_reduceVectorBy), movementVector, Results, 1f);
         UnityEngine.Debug.DrawRay(owner.transform.position + (movementVector/_reduceVectorBy), movementVector/2, Color.red, 100f);
         //UnityEngine.Debug.Break();
@@ -225,19 +283,61 @@ public class TheScript : MonoBehaviour
             {
                 goName = Results[i].transform.name;
                 colliderName = Results[i].collider.name;
-//                UnityEngine.Debug.Log(colliderName);
-                if (trails) DestroyOnCollision(Results[i].transform,  owner);
+                //if(owner.name == "Hunter") UnityEngine.Debug.Log($"Hunter collision logic: {Results[i].transform.name}");
+                if (trails)
+                {
+                    DestroyOnCollision(Results[i].transform.gameObject,  owner);
+                }
+                
                 if (movementVector == Vector3.down)
                 {
 //                    UnityEngine.Debug.Log($"Down: {colliderName}");
                     SpawnTrail(owner, $"{colliderName}");
                 }
                 //UnityEngine.Debug.Break();
-                if(colliderName == "Enemy") DestroyOnCollision(Results[i].transform,  owner);
-                if(colliderName == "Wall") CollideWithWall(owner);
+                if (colliderName == "Enemy")
+                {
+                    UnityEngine.Debug.Log($"Enemy vs: {owner} {Results[i].transform.gameObject}");
+                    DestroyOnCollision(Results[i].transform.gameObject,  owner);
+                }
+                if(colliderName == "Wall") DestroyOnCollision(Results[i].transform.gameObject,  owner);
+                if(colliderName == "Hunter") DestroyOnCollision(Results[i].transform.gameObject,  owner);
                 if(goName == "Player") continue;
-
+                trails = false;
 //                UnityEngine.Debug.Log($"goName: {goName} colliderName: {colliderName}");
+            }
+        }
+    }
+
+    private void CheckMove(Vector3 movementVector, GameObject mover)
+    {
+        string colliderName = "";
+        bool trails = false;
+        if (movementVector != Vector3.down)
+        {
+            trails = CheckForTrails(mover.transform, movementVector);
+        }
+        RaycastHit[] hits;
+        hits = Physics.RaycastAll(mover.transform.position, movementVector, 1f);
+        if (hits.Length > 0)
+        {
+            for (int i = 0; i < hits.Length; i++)
+            {
+                
+                RaycastHit hit = hits[i];
+                colliderName = hit.collider.gameObject.name;
+                UnityEngine.Debug.Log(colliderName);
+                if (trails)
+                {
+                    DestroyOnCollision(hit.transform.gameObject,  mover);
+                }
+                if (movementVector == Vector3.down)
+                {
+                    SpawnTrail(mover, colliderName);
+                }
+                if(colliderName == "Enemy") DestroyOnCollision(hit.collider.gameObject, mover);
+                if(colliderName == "Hunter") DestroyOnCollision(null, mover);
+                if(colliderName == "Wall") DestroyOnCollision(hit.collider.gameObject, mover);
             }
         }
     }
@@ -247,22 +347,35 @@ public class TheScript : MonoBehaviour
         Destroy(owner);
     }
 
-    private void DestroyOnCollision(Transform result, GameObject owner)
+    private void DestroyOnCollision(GameObject target, GameObject owner)
     {
+        
+
         //UnityEngine.Debug.Log($"Ōwner {owner} result {result.transform.gameObject} player {_playerGo}");
-        if (owner == _playerGo || result.gameObject == _playerGo)
+        if (owner == _playerGo || target.gameObject == _playerGo)
         {
             //UnityEngine.Debug.Log("Player destroyed. > GameOver");
             GameOver();
+            Destroy(_playerGo);
         }
-        
-        Instantiate(_particlePf, result.position, Quaternion.identity);
+        //UnityEngine.Debug.Log($"Hunter collision: {owner} {target.gameObject}");
+        if (owner.name == "Hunter")
+        {
+            return;
+        }
+
+        Instantiate(_particlePf, target.transform.position, Quaternion.identity);
         Instantiate(_particlePf, owner.transform.position, Quaternion.identity);
-        Destroy(result.gameObject);
-        Destroy(owner);
+        if(target.gameObject.name != "Wall") Destroy(target.gameObject);
+        if(owner.name != "Wall") Destroy(owner);
 
     }
 
+    private void NotDetectedCollision()
+    {
+        GameOver();
+        Destroy(_playerGo);
+    }
     private void GameOver()
     {
         //show loose text
@@ -312,19 +425,27 @@ public class TheScript : MonoBehaviour
 
     private void SpawnTrail(GameObject trailOwner, string trailName)
     {
+        if (trailName == "Ground") return;
         Vector3 textOffset = new Vector3(0.5f,0.105f,-0.5f);
         
         var offset = new Vector3(trailOwner.transform.position.x-0.5f, 0.92f, trailOwner.transform.position.z+0.5f);
         var trail = Instantiate(_trailPf, offset, Quaternion.identity);
         trail.name = trailName;
-        int trailInt = Int32.Parse(trailName);
+        var trailInt = Int32.Parse(trailName);
         var text = Instantiate(_trailTextPf, trail.transform.position + textOffset, _trailTextPf.transform.rotation, trail.transform);
         //Change trail text color
+        if (trailOwner.name == "Hunter")
+        {
+            trailName = "X";
+            text.GetComponent<TMP_Text>().color = Color.black;
+            text.GetComponent<TMP_Text>().text = trailName;
+            return;
+        }
         if (trailOwner.name == "Enemy")
         {
             text.GetComponent<TMP_Text>().color = _enemyColor;
             _enemyScoreTxt.text = $"Enemy Score: {_enemyScore.ToString()}";
-            _enemyScore += trailInt;
+            _enemyScore += 1;
             _enemyTrailScore.Add(trailInt);
         }
         else
@@ -359,6 +480,51 @@ public class TheScript : MonoBehaviour
     {
         _enemies.Remove(enemy);
     }
+
+    private void SpawnHunter()
+    {
+        GameObject hunter = Instantiate(_enemyPf, RandomV3(), _enemyPf.transform.rotation);
+        hunter.name = "Hunter";
+        _hunter = hunter;
+        hunter.GetComponentInChildren<Renderer>().material.color = Color.red;
+    }
+
+    [SerializeField] private float _hunterCounter = 0;
+    [SerializeField] private float _hunterMovePower = 2;
+    private void HunterLogic()
+    {
+        float hunterMove = Random.Range(1, _hunterMovePower);
+        _hunterMovePower += 0.1f;
+        Vector3 playerLocation = _playerGo.transform.position;
+        Vector3 hunterLocation = _hunter.transform.position;
+        var diffX = Mathf.Abs(playerLocation.x - hunterLocation.x);
+        var diffZ = Mathf.Abs(playerLocation.z - hunterLocation.z);
+        var hunterX = hunterLocation.x;
+        var hunterZ = hunterLocation.z;
+        var playerX = playerLocation.x;
+        var playerZ = playerLocation.z;
+        //UnityEngine.Debug.Log($"Z: {diffZ} X: {diffX}");
+
+        _hunterCounter += hunterMove;
+        if (_hunterCounter > 4)
+        {
+            if (diffZ > diffX)
+            {
+                //UnityEngine.Debug.Log("diffZ");
+                //Move on X axis
+                if(playerZ > hunterZ) RollDirection(Vector3.forward, _hunter);
+                if(playerZ < hunterZ) RollDirection(Vector3.back, _hunter);
+            }
+            else
+            {
+                if(playerX < hunterX) RollDirection(Vector3.left, _hunter);
+                if(playerX > hunterX) RollDirection(Vector3.right, _hunter);
+            }
+
+            _hunterCounter = 0;
+        }
+    }
+    
     private void SpawnEnemies(int amount)
     {
         for (int i = 0; i < amount; i++)
@@ -368,26 +534,13 @@ public class TheScript : MonoBehaviour
             AddEnemyToList(enemy);
         }
     }
-    private void MoveEnemies()
-    {
-        Vector3 randomDirection = new Vector3();
-        foreach (var enemy in _enemies)
-        {
-            
-            if(enemy == null) continue;
-            randomDirection = RandomVector3Direction();
-            //Check for obstacles then move>>>
-            CheckForObstacles(enemy, randomDirection);
-            
 
-        }
-    }
 
     private void CheckForObstacles(GameObject enemy, Vector3 randomDirection)
     {
         //randomDirection = RandomVector3();
-        var enemyPos = enemy.transform.position;
-        bool wall = CheckForWall(enemyPos, randomDirection);
+        var enemyPos = enemy.transform;
+        bool wall = CheckForWall(enemyPos.position, randomDirection);
         bool path = CheckForTrails(enemyPos, randomDirection);
 
         for (int i = 0; i < _enemyChecksForObstacles; i++)
@@ -399,7 +552,7 @@ public class TheScript : MonoBehaviour
 
                 //UnityEngine.Debug.Log($"Enemy {enemy.name} detected wall in {randomDirection} direction.");
                 randomDirection = RandomVector3Direction();
-                wall = CheckForWall(enemyPos, randomDirection);
+                wall = CheckForWall(enemyPos.position, randomDirection);
             }
 
             if (path)
@@ -451,12 +604,12 @@ public class TheScript : MonoBehaviour
         return wallDetected;
     }
 
-    private bool CheckForTrails(Vector3 start, Vector3 dir)
+    private bool CheckForTrails(Transform target, Vector3 dir)
     {
         bool detectPath = false;
         RaycastHit[] Results = new RaycastHit[4];
-        int hits = Physics.RaycastNonAlloc(start + dir, Vector3.down, Results, 3f);
-        UnityEngine.Debug.DrawRay(start + dir, Vector3.down * 1.2f, Color.magenta, 100f);
+        int hits = Physics.RaycastNonAlloc(target.position + dir, Vector3.down, Results, 3f);
+        //UnityEngine.Debug.DrawRay(start + dir, Vector3.down * 1.2f, Color.magenta, 100f);
         if (hits > 0)
         {
             for (int i = 0; i < hits; i++)
@@ -465,6 +618,7 @@ public class TheScript : MonoBehaviour
                 if (Results[i].transform.name is "1" or "2" or "3" or "4" or "5" or "6")
                 {
                     detectPath = true;
+                    if(target.name == "Hunter") Destroy(Results[i].transform.gameObject);
                 }
             }
         }
